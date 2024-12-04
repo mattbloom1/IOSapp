@@ -48,10 +48,7 @@ struct ProjectSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Toggle("Enable Timer", isOn: $project.isTimerActive)
                         .onChange(of: project.isTimerActive) {
-                            if project.isTimerActive {
-                                timerManager.start(interval: TimeInterval(selectedInterval))
-                                project.remainingTime = Int(timerManager.remainingTime)
-                            } else {
+                            if !project.isTimerActive {
                                 timerManager.stop()
                                 project.remainingTime = nil
                             }
@@ -59,7 +56,7 @@ struct ProjectSheet: View {
 
                     if project.isTimerActive {
                         Picker("Interval (minutes)", selection: $selectedInterval) {
-                            ForEach([5, 10, 15, 30, 60], id: \.self) { interval in
+                            ForEach([1, 5, 10, 15, 30, 60], id: \.self) { interval in
                                 Text("\(interval) min").tag(interval)
                             }
                         }
@@ -67,6 +64,22 @@ struct ProjectSheet: View {
 
                         Text("Time Remaining: \(Int(timerManager.remainingTime) / 60)m \(Int(timerManager.remainingTime) % 60)s")
                             .font(.caption)
+
+                        Button(action: {
+                            if timerManager.isRunning {
+                                timerManager.stop()
+                            } else {
+                                timerManager.start(interval: TimeInterval(selectedInterval))
+                                project.remainingTime = Int(timerManager.remainingTime)
+                            }
+                        }) {
+                            Text(timerManager.isRunning ? "Stop Timer" : "Start Timer")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(timerManager.isRunning ? Color.red : Color.green)
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
                     }
                 }
                 .padding()
@@ -85,7 +98,6 @@ struct ProjectSheet: View {
 
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button(action: {
-                        // Save timer state to the database
                         project.timerInterval = selectedInterval
                         project.remainingTime = Int(timerManager.remainingTime)
                         context.insert(project)
@@ -101,9 +113,19 @@ struct ProjectSheet: View {
                 }
             }
         }
-        .onReceive(timerManager.$remainingTime) { newTime in
-            project.remainingTime = Int(newTime)
+        .onAppear {
+            timerManager.onTimerComplete = { promptForUpdate() }
         }
+        .onDisappear {
+            timerManager.stop() // Ensure timer is cleaned up
+        }
+    }
+
+    private func promptForUpdate() {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short)
+        let newUpdate = "Update at \(timestamp):\n"
+        project.content.append("\n\(newUpdate)")
+        isDescriptionFocused = true // Automatically focus the text editor for the user to type
     }
 }
 

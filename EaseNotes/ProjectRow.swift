@@ -39,7 +39,7 @@ struct ProjectRow: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.blue)
+                .fill(Color.white.opacity(0.8))
                 .shadow(radius: 2)
         )
         .padding(.horizontal)
