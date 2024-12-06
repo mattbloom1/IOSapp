@@ -17,7 +17,23 @@ struct EaseNotesApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    requestNotificationPermissions()
+                }
         }
         .modelContainer(modelContainer)
+    }
+
+    private func requestNotificationPermissions() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                print("Error requesting notification permissions: \(error.localizedDescription)")
+            }
+            if granted {
+                print("Notification permissions granted.")
+            } else {
+                print("Notification permissions denied.")
+            }
+        }
     }
 }

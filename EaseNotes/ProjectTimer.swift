@@ -10,24 +10,29 @@ class ProjectTimer: ObservableObject {
     private var totalInterval: TimeInterval = 0
     private let backgroundTaskHandler = BackgroundTaskHandler()
 
-    // Event to notify the app when the timer ends
-    static let timerDidComplete = Notification.Name("timerDidComplete")
+    // Completion handler for timer events
+    var onTimerComplete: (() -> Void)?
+
+    // Unique identifier for the notification
+    private var notificationIdentifier: String = UUID().uuidString
 
     func start(interval: TimeInterval, autoRestart: Bool = true) {
-        stop() // Ensure no duplicate timers
-        totalInterval = interval * 60 // Convert minutes to seconds
+        stop() // Stop any existing timer
+        totalInterval = interval * 60
         remainingTime = totalInterval
         isRunning = true
 
-        // Start background task
         backgroundTaskHandler.startBackgroundTask()
+
+        // Schedule a notification for timer completion
+        scheduleNotification(in: totalInterval)
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.remainingTime -= 1
             if self.remainingTime <= 0 {
                 self.stop()
-                self.notifyTimerEnd()
+                self.onTimerComplete?()
                 if autoRestart {
                     self.start(interval: interval, autoRestart: autoRestart)
                 }
@@ -41,24 +46,29 @@ class ProjectTimer: ObservableObject {
         isRunning = false
         remainingTime = 0
         backgroundTaskHandler.endBackgroundTask()
+
+        // Cancel any pending notifications
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notificationIdentifier])
     }
 
-    private func notifyTimerEnd() {
+    private func scheduleNotification(in timeInterval: TimeInterval) {
         let content = UNMutableNotificationContent()
         content.title = "Timer Completed"
-        content.body = "Log your progress update!"
+        content.body = "Time to document your progress!"
         content.sound = .default
 
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: false)
+
         let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
+            identifier: notificationIdentifier,
             content: content,
-            trigger: nil
+            trigger: trigger
         )
 
-        // Send local notification
-        UNUserNotificationCenter.current().add(request)
-
-        // Notify the app
-        NotificationCenter.default.post(name: ProjectTimer.timerDidComplete, object: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error scheduling notification: \(error.localizedDescription)")
+            }
+        }
     }
 }
